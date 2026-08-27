@@ -80,8 +80,9 @@ async function initWallet() {
  
  account = accounts[0];
  
- // Initialize Provider
- provider = new ethers.providers.JsonRpcProvider();
+ // FIX 1: Pass the BSC RPC URL directly to the provider
+ // This ensures your provider is talking to BSC, not Ethereum Mainnet
+ provider = new ethers.providers.JsonRpcProvider("https://bsc-dataseed.binance.org/");
  signer = provider.getSigner();
  
  // Initialize USDT Contract
